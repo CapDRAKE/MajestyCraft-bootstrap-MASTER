@@ -15,9 +15,9 @@ public class BootstrapConstants {
 	/** ========== OU SE SITUERA LE LAUNCHER ========== **/
 	public static File LAUNCHER = new File(WORKING_DIRECTORY, "MajestyCraft.jar");
 	/** ========== URL DU FICHIER launcher.cfg AVEC LE MD5 ========== **/
-	public static String MD5_URL = "https://majestycraft.w2.websr.fr/minecraft/bootstrap/launcher.cfg";
+	public static String MD5_URL = "https://majestycraft.com/minecraft/bootstrap/launcher.cfg";
 	/** ========== URL DU LAUNCHER.JAR ========== **/
-	public static String LAUNCHER_URL = "https://majestycraft.w2.websr.fr/minecraft/bootstrap/MajestyCraft.jar";
+	public static String LAUNCHER_URL = "https://majestycraft.com/minecraft/bootstrap/MajestyCraft.jar";
 	/** ========== COULEUR DU CERCLE REMPLIS ========== **/
 	public static Paint color = Color.orange;
 

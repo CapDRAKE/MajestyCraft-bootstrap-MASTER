@@ -41,7 +41,7 @@ public final class BootPanel extends JPanel {
 		if (this.logoIcon != null) {
 			g.drawImage(this.logoIcon, 0, 20, 340, 160, this);
 		}
-		g.setColor(Color.WHITE);
+		g.setColor(Color.orange);
 		String percentageToDisplay = String.valueOf(launcherDownloader.getProgress()) + "%";
 		g.drawString(percentageToDisplay, 415 - g.getFontMetrics(FontLoader.loadFontAWT("minecraft.ttf", "Minecraftia", 30F)).stringWidth(percentageToDisplay) / 2 + 10, 110);
 	}
