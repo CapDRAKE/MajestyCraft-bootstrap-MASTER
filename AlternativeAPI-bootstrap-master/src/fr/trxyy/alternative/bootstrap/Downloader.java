@@ -16,8 +16,6 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 
 import fr.trxyy.alternative.alternative_api.utils.file.FileUtil;
-import fr.trxyy.alternative.alternative_api_ui.LauncherAlert;
-import javafx.application.Platform;
 
 public class Downloader extends Thread {
 	public JFrame frame;

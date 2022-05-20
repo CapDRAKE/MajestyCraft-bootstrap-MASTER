@@ -2,8 +2,6 @@ package fr.trxyy.alternative.bootstrap;
 
 import java.awt.Color;
 import java.io.IOException;
-
-import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 
 public class Home extends JFrame {
