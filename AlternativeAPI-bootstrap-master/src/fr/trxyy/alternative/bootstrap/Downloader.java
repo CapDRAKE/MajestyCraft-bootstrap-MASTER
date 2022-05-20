@@ -4,8 +4,11 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -13,6 +16,8 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 
 import fr.trxyy.alternative.alternative_api.utils.file.FileUtil;
+import fr.trxyy.alternative.alternative_api_ui.LauncherAlert;
+import javafx.application.Platform;
 
 public class Downloader extends Thread {
 	public JFrame frame;
@@ -63,12 +68,22 @@ public class Downloader extends Thread {
 	
 	private void checkLocalMD5(File launcher) {
 		if (!launcher.exists()) {
-			update(launcher, BootstrapConstants.getLauncherUrl());
+			if(Downloader.netIsAvailable()) {
+				update(launcher, BootstrapConstants.getLauncherUrl());
+			}
+			else {
+				JOptionPane.showMessageDialog(null, "Connexion à internet impossible pour télécharger le launcher");
+			}
 		} else {
 			String localMD5 = FileUtil.getMD5(launcher);
-			String hostMD5 = FileUtil.readMD5(BootstrapConstants.getHashUrl());
-			if (!localMD5.equals(hostMD5)) {
-				update(launcher, BootstrapConstants.getLauncherUrl());
+			if(Downloader.netIsAvailable()) {
+				String hostMD5 = FileUtil.readMD5(BootstrapConstants.getHashUrl());
+				if (!localMD5.equals(hostMD5)) {
+					update(launcher, BootstrapConstants.getLauncherUrl());
+				}
+			}
+			else {
+				JOptionPane.showMessageDialog(null, "Attention, vous êtes en mode offline. Une mise à jour pourrait être disponible.\nSi le launcher ne démarre pas, merci de vous connecter à internet.");
 			}
 		}
 	}
@@ -76,6 +91,7 @@ public class Downloader extends Thread {
 	public void launch(File f) {
 		ProcessBuilder pb = new ProcessBuilder(new String[] { "java", "-jar", f.getAbsolutePath() });
 		try {
+			System.out.println("test");
 			pb.start();
 			exitProperly();
 		} catch (Exception e) {
@@ -95,5 +111,21 @@ public class Downloader extends Thread {
 
 	public int getProgress() {
 		return this.percentage;
+	}
+	
+	private static boolean netIsAvailable() {
+	    try {
+	        final URL url = new URL("https://www.google.com");
+	        final URLConnection conn = url.openConnection();
+	        conn.connect();
+	        conn.getInputStream().close();
+	        System.out.println("ok");
+	        return true;
+	    } catch (MalformedURLException e) {
+	        throw new RuntimeException(e);
+	    } catch (IOException e) {
+	        System.out.println(e);
+	        return false;
+	    }
 	}
 }
