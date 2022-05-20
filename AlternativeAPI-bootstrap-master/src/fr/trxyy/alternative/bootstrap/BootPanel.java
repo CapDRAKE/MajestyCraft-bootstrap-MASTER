@@ -19,7 +19,7 @@ public final class BootPanel extends JPanel {
 	public BootPanel(final Home home) {
 		this.setLayout(new BorderLayout());
 		/** ================= ON RECUPERE LE LOGO DU SERVEUR ================= **/
-		this.logoIcon = BootstrapConstants.getResourceLocation().loadImageAWT("logo.png");
+		this.logoIcon = BootstrapConstants.getResourceLocation().loadImageAWT("launcher.png");
 		this.setFont(FontLoader.loadFontAWT("minecraft.ttf", "Minecraftia", 20F));
 		this.launcherDownloader = new Downloader(home);
 		this.add(progressBar);
@@ -39,11 +39,11 @@ public final class BootPanel extends JPanel {
 	public void paint(Graphics g) {
 		super.paint(g);
 		if (this.logoIcon != null) {
-			g.drawImage(this.logoIcon, 0, 20, 340, 160, this);
+			g.drawImage(this.logoIcon, 70, 20, 160, 160, this);
 		}
 		g.setColor(Color.orange);
 		String percentageToDisplay = String.valueOf(launcherDownloader.getProgress()) + "%";
-		g.drawString(percentageToDisplay, 415 - g.getFontMetrics(FontLoader.loadFontAWT("minecraft.ttf", "Minecraftia", 30F)).stringWidth(percentageToDisplay) / 2 + 10, 110);
+		g.drawString(percentageToDisplay, 415 - g.getFontMetrics(FontLoader.loadFontAWT("minecraft.ttf", "Minecraftia", 30F)).stringWidth(percentageToDisplay) / 2 - 103, 105);
 	}
 
 	public static JCircleProgressBar getProgressBar() {

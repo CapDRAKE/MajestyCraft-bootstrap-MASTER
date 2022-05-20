@@ -26,7 +26,7 @@ public class ProgressCircleUI extends BasicProgressBarUI {
 
 	public void paint(Graphics g, JComponent c) {
 		Insets b = this.progressBar.getInsets();
-		int barRectWidth = this.progressBar.getWidth() - b.right - b.left + 350;
+		int barRectWidth = this.progressBar.getWidth() - b.right - b.left + 120;
 		int barRectHeight = this.progressBar.getHeight() - b.top - b.bottom;
 		if (barRectWidth <= 0 || barRectHeight <= 0) {
 			return;
