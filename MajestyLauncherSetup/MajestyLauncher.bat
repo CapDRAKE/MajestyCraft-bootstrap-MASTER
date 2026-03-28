@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul 2>nul
-title MajestyCraft - Setup
+title MajestyLauncher - Setup
 
 :: ===================================
 ::   Configuration
@@ -29,10 +29,10 @@ goto :install
 cls
 echo.
 echo   ========================================
-echo            MajestyCraft Launcher
+echo            MajestyLauncher
 echo   ========================================
 echo.
-echo   [1] Lancer MajestyCraft
+echo   [1] Lancer MajestyLauncher
 echo   [2] Reparer l'installation
 echo   [3] Desinstaller
 echo   [4] Quitter
@@ -52,20 +52,20 @@ goto :menu
 cls
 echo.
 echo   ========================================
-echo          MajestyCraft - Setup
+echo          MajestyLauncher - Setup
 echo   ========================================
 echo.
 echo   Bienvenue dans l'installateur
-echo   de MajestyCraft !
+echo   de MajestyLauncher !
 echo.
 echo   Ce programme va installer :
 echo   - Java 8 portable
-echo   - MajestyCraft Bootstrap
+echo   - MajestyLauncher Bootstrap
 echo.
 echo   Emplacement :
 echo   %INSTALL_DIR%
 echo.
-set /p "CONFIRM=  Installer MajestyCraft ? [O/N] : "
+set /p "CONFIRM=  Installer MajestyLauncher ? [O/N] : "
 if /i not "%CONFIRM%"=="O" goto :cancel
 
 echo.
@@ -154,6 +154,10 @@ echo echo   MajestyCraft a ete desinstalle.>> "%UNINSTALL_BAT%"
 echo echo.>> "%UNINSTALL_BAT%"
 echo pause>> "%UNINSTALL_BAT%"
 
+:: Supprimer ancien raccourci MajestyCraft s'il existe
+del "%USERPROFILE%\Desktop\MajestyCraft.lnk" 2>nul
+del "%USERPROFILE%\OneDrive\Bureau\MajestyCraft.lnk" 2>nul
+
 :: Creer raccourcis via VBS (plus fiable que PowerShell)
 set "SHORTCUT_VBS=%INSTALL_DIR%\shortcut_tmp.vbs"
 echo Set ws = CreateObject("WScript.Shell")> "%SHORTCUT_VBS%"
@@ -161,7 +165,7 @@ echo Set lnk = ws.CreateShortcut(ws.SpecialFolders("Desktop") ^& "\MajestyLaunch
 echo lnk.TargetPath = "%LAUNCHER_VBS%">> "%SHORTCUT_VBS%"
 echo lnk.WorkingDirectory = "%INSTALL_DIR%">> "%SHORTCUT_VBS%"
 echo lnk.IconLocation = "%ICON%,0">> "%SHORTCUT_VBS%"
-echo lnk.Description = "Lancer MajestyCraft">> "%SHORTCUT_VBS%"
+echo lnk.Description = "Lancer MajestyLauncher">> "%SHORTCUT_VBS%"
 echo lnk.Save>> "%SHORTCUT_VBS%"
 echo Set lnk2 = ws.CreateShortcut(ws.SpecialFolders("Programs") ^& "\MajestyLauncher.lnk")>> "%SHORTCUT_VBS%"
 echo lnk2.TargetPath = "%LAUNCHER_VBS%">> "%SHORTCUT_VBS%"
