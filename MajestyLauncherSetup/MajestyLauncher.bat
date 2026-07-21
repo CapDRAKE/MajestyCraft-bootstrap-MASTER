@@ -74,6 +74,14 @@ echo     Installation en cours...
 echo   -------------------------------------------
 echo.
 
+:: Ferme un eventuel MajestyLauncher/bootstrap deja lance depuis cette
+:: installation : sinon le java.exe encore actif garde les fichiers du JRE
+:: ouverts et toute tentative de reinstallation/reparation echoue (rmdir,
+:: ren, robocopy... rien ne peut remplacer un fichier utilise par un
+:: processus en cours).
+powershell -NoProfile -Command "Get-Process -Name java,javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith('%INSTALL_DIR%', [System.StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue" 2>nul
+timeout /t 1 /nobreak >nul
+
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
 :: --- Etape 1 : Java ---
@@ -82,16 +90,35 @@ if exist "%JAVA%" goto :java_ok
 echo   [1/4] Telechargement de Java 8...
 echo         Cela peut prendre quelques minutes.
 echo.
+
+:: Nettoyage d'une precedente tentative interrompue. On utilise un dossier
+:: d'extraction temporaire a part (jre_tmp) pour ne jamais avoir a renommer
+:: par-dessus %JRE_DIR% : "rmdir /s /q" ne se termine pas toujours de facon
+:: synchrone sur de gros dossiers (antivirus, etc.), et un "ren" juste apres
+:: peut alors echouer avec "le nom de fichier existe deja" meme si la
+:: suppression a ete lancee. robocopy /MOVE est beaucoup plus robuste
+:: (retries integres) qu'un simple "ren"/"move" pour deplacer le contenu.
+if exist "%INSTALL_DIR%\jre_tmp" rmdir /s /q "%INSTALL_DIR%\jre_tmp" 2>nul
+del "%INSTALL_DIR%\jre.zip" 2>nul
+
 curl -L -# -o "%INSTALL_DIR%\jre.zip" "%JRE_URL%"
 if errorlevel 1 goto :err_download
 
 echo.
 echo   [2/4] Extraction de Java...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%INSTALL_DIR%\jre.zip' -DestinationPath '%INSTALL_DIR%' -Force" 2>nul
+mkdir "%INSTALL_DIR%\jre_tmp" 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%INSTALL_DIR%\jre.zip' -DestinationPath '%INSTALL_DIR%\jre_tmp' -Force" 2>nul
 
-for /d %%i in ("%INSTALL_DIR%\zulu*") do (
-    if exist "%%i\bin\javaw.exe" ren "%%i" "jre"
+if exist "%JRE_DIR%" rmdir /s /q "%JRE_DIR%" 2>nul
+mkdir "%JRE_DIR%" 2>nul
+
+for /d %%i in ("%INSTALL_DIR%\jre_tmp\zulu*") do (
+    if exist "%%i\bin\javaw.exe" (
+        robocopy "%%i" "%JRE_DIR%" /E /MOVE /NFL /NDL /NJH /NJS /R:5 /W:1 >nul
+    )
 )
+
+rmdir /s /q "%INSTALL_DIR%\jre_tmp" 2>nul
 del "%INSTALL_DIR%\jre.zip" 2>nul
 
 if not exist "%JAVA%" goto :err_extract

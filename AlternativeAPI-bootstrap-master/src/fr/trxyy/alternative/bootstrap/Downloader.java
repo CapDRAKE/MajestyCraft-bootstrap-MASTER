@@ -2,18 +2,24 @@ package fr.trxyy.alternative.bootstrap;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.Timer;
 import java.util.TimerTask;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import fr.trxyy.alternative.alternative_api.utils.file.FileUtil;
 
@@ -70,20 +76,57 @@ public class Downloader extends Thread {
 				update(launcher, BootstrapConstants.getLauncherUrl());
 			}
 			else {
-				JOptionPane.showMessageDialog(null, "Connexion à internet impossible pour télécharger le launcher");
+				JOptionPane.showMessageDialog(null, "Connexion ï¿½ internet impossible pour tï¿½lï¿½charger le launcher");
 			}
 		} else {
 			String localMD5 = FileUtil.getMD5(launcher);
 			if(Downloader.netIsAvailable()) {
-				String hostMD5 = FileUtil.readMD5(BootstrapConstants.getHashUrl());
+				String hostMD5 = readRemoteMD5(BootstrapConstants.getHashUrl());
 				if (!localMD5.equals(hostMD5)) {
 					update(launcher, BootstrapConstants.getLauncherUrl());
 				}
 			}
 			else {
-				JOptionPane.showMessageDialog(null, "Attention, vous êtes en mode offline. Une mise à jour pourrait être disponible.\nSi le launcher ne démarre pas, merci de vous connecter à internet.");
+				JOptionPane.showMessageDialog(null, "Attention, vous ï¿½tes en mode offline. Une mise ï¿½ jour pourrait ï¿½tre disponible.\nSi le launcher ne dï¿½marre pas, merci de vous connecter ï¿½ internet.");
 			}
 		}
+	}
+
+	/**
+	 * Lit le hash MD5 distant. Accepte le nouveau format JSON ({"md5": "..."})
+	 * et, en repli, l'ancien format texte brut (une seule ligne contenant le hash).
+	 */
+	private static String readRemoteMD5(String url) {
+		String raw = "";
+		try {
+			URL target = new URL(url);
+			HttpURLConnection connection = (HttpURLConnection) target.openConnection();
+			connection.setRequestProperty("User-Agent", "MajestyCraft-Bootstrap");
+			connection.setConnectTimeout(8000);
+			connection.setReadTimeout(8000);
+
+			StringBuilder sb = new StringBuilder();
+			try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = in.readLine()) != null) {
+					sb.append(line).append('\n');
+				}
+			}
+			raw = sb.toString().trim();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return "";
+		}
+
+		try {
+			JsonObject obj = JsonParser.parseString(raw).getAsJsonObject();
+			if (obj.has("md5") && !obj.get("md5").isJsonNull()) {
+				return obj.get("md5").getAsString();
+			}
+		} catch (Exception ignored) {
+			// Pas du JSON valide : on suppose l'ancien format texte brut (launcher.cfg)
+		}
+		return raw;
 	}
 	
 	public void launch(File f) {

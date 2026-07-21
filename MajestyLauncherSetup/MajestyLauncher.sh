@@ -158,6 +158,10 @@ else
     JRE_URL="$(get_jre_url)"
     JRE_ARCHIVE="$INSTALL_DIR/jre-download.tar.gz"
 
+    # Nettoyage d'une precedente tentative interrompue (sinon le "mv" plus bas
+    # deplace l'archive DANS $JRE_DIR au lieu de la renommer)
+    rm -rf "$JRE_DIR" "$INSTALL_DIR/jre_tmp" "$JRE_ARCHIVE"
+
     echo "  [1/3] Telechargement de Java 8..."
     echo "        $JRE_URL"
     echo "        Cela peut prendre quelques minutes."
