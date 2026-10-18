@@ -130,7 +130,7 @@ public class Downloader extends Thread {
 	}
 	
 	public void launch(File f) {
-		ProcessBuilder pb = new ProcessBuilder(new String[] { "java", "-jar", f.getAbsolutePath() });
+		ProcessBuilder pb = new ProcessBuilder(new String[] { currentJavaExecutable(), "-jar", f.getAbsolutePath() });
 		try {
 			System.out.println("test");
 			pb.start();
@@ -140,6 +140,19 @@ public class Downloader extends Thread {
 			JOptionPane.showMessageDialog(null, e.getMessage());
 			exitProperly();
 		}
+	}
+
+	/**
+	 * Java qui execute le bootstrap (le Java portable avec JavaFX installe par le
+	 * script). La commande "java" seule designait, sous Linux et macOS, le Java du
+	 * systeme : souvent absent, ou en version 17/21 sans JavaFX, et le launcher ne
+	 * demarrait pas. Sous Windows on garde java.exe, comme avant.
+	 */
+	private static String currentJavaExecutable() {
+		File bin = new File(System.getProperty("java.home"), "bin");
+		boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+		File java = new File(bin, windows ? "java.exe" : "java");
+		return java.isFile() ? java.getAbsolutePath() : "java";
 	}
 
 	private static void exitProperly() {

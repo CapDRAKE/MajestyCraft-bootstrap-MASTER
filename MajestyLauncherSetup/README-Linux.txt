@@ -5,6 +5,7 @@
 Contenu du ZIP :
   - MajestyLauncher.sh   (installateur)
   - bootstrap.jar        (bootstrap du launcher)
+  - majestycraft.png     (icone des raccourcis)
 
 Installation :
   1. Extraire le ZIP dans un dossier de votre choix
@@ -23,12 +24,18 @@ Installation :
      - Creer un raccourci sur le bureau
      - Lancer MajestyLauncher
 
+Deja installe ?
+  Si le launcher ne s'ouvrait pas, relancer MajestyLauncher.sh
+  et choisir "Reparer l'installation" : les raccourcis sont
+  recrees avec le bon Java.
+
 Desinstallation :
   - Relancer MajestyLauncher.sh et choisir "Desinstaller"
 
 Dependances :
   - curl ou wget (pour le telechargement)
   - tar (pour l'extraction)
+  - FFmpeg (facultatif, pour la musique du launcher)
 
 Configuration requise :
   - Distribution Linux avec glibc (Ubuntu, Debian, Fedora, etc.)

@@ -55,7 +55,7 @@ BOOTSTRAP_JAR_NAME="bootstrap.jar"
 #   Utility
 # ===================================
 header() {
-    clear
+    clear 2>/dev/null || true
     echo ""
     echo "  ========================================"
     echo "    $1"
@@ -71,6 +71,10 @@ detect_platform
 JRE_DIR="$INSTALL_DIR/$JRE_SUBDIR"
 JAVA="$JRE_DIR/bin/java"
 BOOTSTRAP_JAR="$INSTALL_DIR/$BOOTSTRAP_JAR_NAME"
+
+# Le bootstrap relance le launcher avec la commande "java" : sans cela, c'est le
+# Java du systeme qui serait pris (souvent absent, ou en 17/21 sans JavaFX).
+export PATH="$JRE_DIR/bin:$PATH"
 
 # ===================================
 #   If already installed, show menu
@@ -106,7 +110,9 @@ if [ -f "$JAVA" ] && [ -f "$BOOTSTRAP_JAR" ]; then
                 if [ "$CONFIRM" = "o" ] || [ "$CONFIRM" = "O" ]; then
                     # Remove desktop shortcut (Linux)
                     rm -f "$HOME/.local/share/applications/majestylauncher.desktop" 2>/dev/null
-                    rm -f "$HOME/Desktop/MajestyLauncher.desktop" 2>/dev/null
+                    rm -f "$HOME/Desktop/MajestyLauncher.desktop" "$HOME/Bureau/MajestyLauncher.desktop" 2>/dev/null
+                    DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+                    [ -n "$DESKTOP_DIR" ] && rm -f "$DESKTOP_DIR/MajestyLauncher.desktop" 2>/dev/null
                     # Remove macOS app alias
                     rm -rf "$HOME/Applications/MajestyLauncher.app" 2>/dev/null
                     rm -rf "$INSTALL_DIR"
@@ -239,6 +245,7 @@ LAUNCHER_SH="$INSTALL_DIR/launch.sh"
 cat > "$LAUNCHER_SH" << LAUNCHER_EOF
 #!/usr/bin/env bash
 cd "\$(dirname "\$0")"
+export PATH="$JRE_DIR/bin:\$PATH"
 exec "$JRE_DIR/bin/java" -jar "$BOOTSTRAP_JAR"
 LAUNCHER_EOF
 chmod +x "$LAUNCHER_SH"
@@ -272,13 +279,19 @@ Categories=Game;
 DESKTOP_EOF
     chmod +x "$DESKTOP_FILE"
 
-    # Copy to Desktop if it exists
-    if [ -d "$HOME/Desktop" ]; then
-        cp "$DESKTOP_FILE" "$HOME/Desktop/MajestyLauncher.desktop"
-        chmod +x "$HOME/Desktop/MajestyLauncher.desktop"
-    elif [ -d "$HOME/Bureau" ]; then
-        cp "$DESKTOP_FILE" "$HOME/Bureau/MajestyLauncher.desktop"
-        chmod +x "$HOME/Bureau/MajestyLauncher.desktop"
+    # Copy to Desktop (dossier Bureau reel, quelle que soit la langue)
+    DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+    if [ -z "$DESKTOP_DIR" ] || [ ! -d "$DESKTOP_DIR" ]; then
+        if [ -d "$HOME/Desktop" ]; then DESKTOP_DIR="$HOME/Desktop"
+        elif [ -d "$HOME/Bureau" ]; then DESKTOP_DIR="$HOME/Bureau"
+        else DESKTOP_DIR=""
+        fi
+    fi
+    if [ -n "$DESKTOP_DIR" ]; then
+        cp "$DESKTOP_FILE" "$DESKTOP_DIR/MajestyLauncher.desktop"
+        chmod +x "$DESKTOP_DIR/MajestyLauncher.desktop"
+        # GNOME : sans cela, le raccourci demande « Autoriser le lancement »
+        gio set "$DESKTOP_DIR/MajestyLauncher.desktop" metadata::trusted true 2>/dev/null || true
     fi
 
     echo "        Raccourcis crees (menu applications + bureau)."
@@ -298,6 +311,7 @@ elif [ "$PLATFORM" = "macos" ]; then
     cat > "$APP_DIR/Contents/MacOS/MajestyLauncher" << MACOS_EOF
 #!/usr/bin/env bash
 cd "$INSTALL_DIR"
+export PATH="$JRE_DIR/bin:\$PATH"
 exec "$JRE_DIR/bin/java" -jar "$BOOTSTRAP_JAR"
 MACOS_EOF
     chmod +x "$APP_DIR/Contents/MacOS/MajestyLauncher"
