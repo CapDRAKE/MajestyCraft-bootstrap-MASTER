@@ -76,6 +76,79 @@ BOOTSTRAP_JAR="$INSTALL_DIR/$BOOTSTRAP_JAR_NAME"
 # Java du systeme qui serait pris (souvent absent, ou en 17/21 sans JavaFX).
 export PATH="$JRE_DIR/bin:$PATH"
 
+# Chromebook : environnement Linux de ChromeOS (conteneur Crostini)
+IS_CHROMEOS=0
+if [ "$PLATFORM" = "linux" ] && { [ -e /dev/.cros_milestone ] || [ -d /opt/google/cros-containers ]; }; then
+    IS_CHROMEOS=1
+fi
+
+# ===================================
+#   Dependances systeme (Linux)
+# ===================================
+# Bibliotheques dont ont besoin Java/JavaFX (fenetre GTK, X11) et Minecraft
+# (OpenGL, son). Presentes sur un bureau classique, souvent absentes d'un
+# Linux minimal ou de l'environnement Linux d'un Chromebook.
+# Debian 13+ a renomme certains paquets (suffixe t64) : on prend le nom disponible.
+pkg_name() {
+    if command -v apt-cache >/dev/null 2>&1 && apt-cache show "${1}t64" >/dev/null 2>&1; then
+        echo "${1}t64"
+    else
+        echo "$1"
+    fi
+}
+
+find_missing_packages() {
+    MISSING=""
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || MISSING="$MISSING curl"
+    command -v tar >/dev/null 2>&1 || MISSING="$MISSING tar"
+    LDCONFIG="$(command -v ldconfig 2>/dev/null || true)"
+    [ -z "$LDCONFIG" ] && [ -x /sbin/ldconfig ] && LDCONFIG=/sbin/ldconfig
+    if [ -n "$LDCONFIG" ]; then
+        LIBS="$("$LDCONFIG" -p 2>/dev/null || true)"
+        echo "$LIBS" | grep -q "libgtk-3.so.0"   || MISSING="$MISSING $(pkg_name libgtk-3-0)"
+        echo "$LIBS" | grep -q "libXtst.so.6"    || MISSING="$MISSING libxtst6"
+        echo "$LIBS" | grep -q "libXxf86vm.so.1" || MISSING="$MISSING libxxf86vm1"
+        echo "$LIBS" | grep -q "libGL.so.1"      || MISSING="$MISSING libgl1"
+        echo "$LIBS" | grep -q "libasound.so.2"  || MISSING="$MISSING $(pkg_name libasound2)"
+        echo "$LIBS" | grep -q "libpulse.so.0"   || MISSING="$MISSING libpulse0"
+    fi
+    # Pilotes OpenGL Mesa (GPU virtuel virgl des Chromebooks, ou rendu logiciel) :
+    # sans eux, libGL est presente mais aucune fenetre OpenGL ne peut s'ouvrir.
+    if command -v dpkg >/dev/null 2>&1 && ! dpkg -s libgl1-mesa-dri >/dev/null 2>&1; then
+        MISSING="$MISSING libgl1-mesa-dri"
+    fi
+    # Anciennes versions (LWJGL 2, Minecraft 1.12 et avant) : xrandr requis (x86_64 seulement)
+    if [ "$ARCH_TAG" = "x64" ]; then
+        command -v xrandr >/dev/null 2>&1 || MISSING="$MISSING x11-xserver-utils"
+    fi
+}
+
+install_linux_dependencies() {
+    [ "$PLATFORM" = "linux" ] || return 0
+    find_missing_packages
+    if [ -z "$MISSING" ]; then
+        echo "  [0/3] Dependances systeme presentes."
+        return 0
+    fi
+    echo "  [0/3] Paquets systeme manquants :$MISSING"
+    if command -v apt-get >/dev/null 2>&1; then
+        printf "        Les installer maintenant (sudo) ? [O/n] : "
+        read -r DEPS_OK
+        if [ "$DEPS_OK" != "n" ] && [ "$DEPS_OK" != "N" ]; then
+            # shellcheck disable=SC2086
+            if sudo apt-get update && sudo apt-get install -y $MISSING; then
+                echo "        Dependances installees."
+            else
+                echo "        ATTENTION : installation incomplete, le launcher risque de ne pas demarrer."
+            fi
+        fi
+    else
+        echo "        Installez-les avec le gestionnaire de paquets de votre distribution"
+        echo "        (noms Debian/Ubuntu ci-dessus ; GTK 3, Xtst, Xxf86vm, OpenGL, ALSA, PulseAudio)."
+    fi
+    echo ""
+}
+
 # ===================================
 #   If already installed, show menu
 # ===================================
@@ -138,7 +211,14 @@ echo "  Ce programme va installer :"
 echo "  - Java 8 portable (Azul Zulu FX)"
 echo "  - MajestyLauncher Bootstrap"
 echo ""
-echo "  Systeme detecte : $PLATFORM ($ARCH_TAG)"
+if [ "$IS_CHROMEOS" = "1" ]; then
+    echo "  Systeme detecte : Chromebook ($ARCH_TAG)"
+else
+    echo "  Systeme detecte : $PLATFORM ($ARCH_TAG)"
+fi
+if [ "$PLATFORM" = "linux" ] && [ "$ARCH_TAG" = "aarch64" ]; then
+    echo "  Processeur ARM : Minecraft 1.19 ou plus recent."
+fi
 echo "  Emplacement : $INSTALL_DIR"
 echo ""
 printf "  Installer $APP_NAME ? [o/N] : "
@@ -156,6 +236,9 @@ echo "  -------------------------------------------"
 echo ""
 
 mkdir -p "$INSTALL_DIR"
+
+# --- Step 0: dependances systeme (Linux) ---
+install_linux_dependencies
 
 # --- Step 1: Java ---
 if [ -f "$JAVA" ]; then
@@ -196,9 +279,13 @@ else
         exit 1
     fi
 
-    # On macOS, the JRE is inside Contents/Home
-    if [ "$PLATFORM" = "macos" ] && [ -d "$ZULU_DIR/Contents/Home" ]; then
-        mv "$ZULU_DIR/Contents/Home" "$JRE_DIR"
+    # On macOS, the JRE is inside <archive>/zulu-8.jre/Contents/Home
+    JRE_HOME_SRC=""
+    if [ "$PLATFORM" = "macos" ]; then
+        JRE_HOME_SRC="$(find "$ZULU_DIR" -maxdepth 3 -type d -path "*/Contents/Home" | head -1)"
+    fi
+    if [ -n "$JRE_HOME_SRC" ]; then
+        mv "$JRE_HOME_SRC" "$JRE_DIR"
     else
         mv "$ZULU_DIR" "$JRE_DIR"
     fi
@@ -294,7 +381,11 @@ DESKTOP_EOF
         gio set "$DESKTOP_DIR/MajestyLauncher.desktop" metadata::trusted true 2>/dev/null || true
     fi
 
-    echo "        Raccourcis crees (menu applications + bureau)."
+    if [ "$IS_CHROMEOS" = "1" ]; then
+        echo "        Raccourci ajoute au lanceur ChromeOS (dossier « Applications Linux »)."
+    else
+        echo "        Raccourcis crees (menu applications + bureau)."
+    fi
 
 elif [ "$PLATFORM" = "macos" ]; then
     # Create a minimal .app bundle
@@ -348,7 +439,16 @@ header "Installation terminee !"
 echo "  $APP_NAME a ete installe dans :"
 echo "  $INSTALL_DIR"
 echo ""
-if [ "$PLATFORM" = "linux" ]; then
+if [ "$IS_CHROMEOS" = "1" ]; then
+    echo "  Raccourci : lanceur ChromeOS > Applications Linux > MajestyLauncher"
+    echo ""
+    echo "  Conseils Chromebook :"
+    echo "  - Activez l'acceleration graphique de Linux :"
+    echo "      chrome://flags/#crostini-gpu-support  (puis redemarrez)"
+    echo "  - Si la camera tourne sans arret en jeu :"
+    echo "      chrome://flags/#exo-pointer-lock  (puis redemarrez)"
+    echo "  - Donnez au moins 4 Go de RAM au jeu dans les Reglages du launcher."
+elif [ "$PLATFORM" = "linux" ]; then
     echo "  Raccourcis crees :"
     echo "  - Menu Applications"
     echo "  - Bureau"

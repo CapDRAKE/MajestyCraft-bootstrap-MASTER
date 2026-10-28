@@ -6,6 +6,7 @@ Contenu du ZIP :
   - MajestyLauncher.sh   (installateur)
   - bootstrap.jar        (bootstrap du launcher)
   - majestycraft.png     (icone des raccourcis)
+  - README-ChromeOS.txt  (guide Chromebook)
 
 Installation :
   1. Extraire le ZIP dans un dossier de votre choix
@@ -39,7 +40,9 @@ Dependances :
 
 Configuration requise :
   - Distribution Linux avec glibc (Ubuntu, Debian, Fedora, etc.)
-  - Architecture x86_64 ou aarch64
+  - Architecture x86_64 (toutes les versions de Minecraft)
+    ou ARM aarch64 (Minecraft 1.19 et plus recent)
+  - Chromebook : voir README-ChromeOS.txt
   - Connexion internet (pour le telechargement de Java)
   - ~200 Mo d'espace disque
 
