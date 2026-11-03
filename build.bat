@@ -46,7 +46,7 @@ for %%f in ("%LIB%\*.jar") do (
 
 :: Compile Java sources
 echo   [1/4] Compilation des sources...
-javac -source 1.8 -target 1.8 -encoding ISO-8859-1 -cp "%CP%" -d "%BUILD%\classes" -sourcepath "%SRC%" "%SRC%\fr\trxyy\alternative\bootstrap\Home.java" "%SRC%\fr\trxyy\alternative\bootstrap\BootPanel.java" "%SRC%\fr\trxyy\alternative\bootstrap\BootstrapConstants.java" "%SRC%\fr\trxyy\alternative\bootstrap\Downloader.java" "%SRC%\fr\trxyy\alternative\bootstrap\ui\JCircleProgressBar.java" "%SRC%\fr\trxyy\alternative\bootstrap\ui\ProgressCircleUI.java"
+javac -source 1.8 -target 1.8 -encoding ISO-8859-1 -cp "%CP%" -d "%BUILD%\classes" -sourcepath "%SRC%" "%SRC%\fr\trxyy\alternative\bootstrap\Home.java" "%SRC%\fr\trxyy\alternative\bootstrap\BootPanel.java" "%SRC%\fr\trxyy\alternative\bootstrap\BootstrapConstants.java" "%SRC%\fr\trxyy\alternative\bootstrap\Downloader.java" "%SRC%\fr\trxyy\alternative\bootstrap\LauncherSignature.java" "%SRC%\fr\trxyy\alternative\bootstrap\ui\JCircleProgressBar.java" "%SRC%\fr\trxyy\alternative\bootstrap\ui\ProgressCircleUI.java"
 if errorlevel 1 (
     echo   ERREUR: La compilation a echoue.
     pause
@@ -63,6 +63,9 @@ for %%f in ("..\..\%LIB%\*.jar") do (
 if exist "META-INF\*.SF" del /q "META-INF\*.SF" 2>nul
 if exist "META-INF\*.DSA" del /q "META-INF\*.DSA" 2>nul
 if exist "META-INF\*.RSA" del /q "META-INF\*.RSA" 2>nul
+:: AlternativeAPI.jar contient par erreur ses propres sources et des jars (jfxrt.jar...) sous
+:: src/ : 31 Mo jamais lus. Retires pour alleger le bootstrap.
+if exist "src" rmdir /s /q "src"
 popd
 
 :: Copy resources

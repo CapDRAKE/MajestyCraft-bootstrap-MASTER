@@ -12,6 +12,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -32,72 +35,103 @@ public class Downloader extends Thread {
 	}
 
 	public void run() {
-		this.checkLocalMD5(BootstrapConstants.getLauncherFile());
-		this.launch(BootstrapConstants.getLauncherFile());
+		File launcher = BootstrapConstants.getLauncherFile();
+		this.checkLocalMD5(launcher);
+		if (launcher.isFile()) {
+			this.launch(launcher);
+		} else {
+			exitProperly();
+		}
 	}
 
+	/** Empreinte et signature du launcher en ligne, lues dans launcher.json. */
+	static final class RemoteInfo {
+		String md5 = "";
+		String sig = "";
+	}
 
-	public void update(File f, String u) {
+	/**
+	 * Telecharge le launcher dans un fichier temporaire et ne remplace l'ancien que si le
+	 * nouveau est complet et signe par MajestyCraft (LauncherSignature).
+	 * @return true si le launcher a ete mis a jour
+	 */
+	public boolean update(File f, String u, RemoteInfo info) {
+		File temp = new File(f.getParentFile(), f.getName() + ".part");
 		try {
 			URL url = new URL(u.replace(" ", "%20"));
 			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 			connection.addRequestProperty("User-Agent", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.124 Safari/537.36");
-			if (!f.exists()) {
-				f.getParentFile().mkdirs();
-				f.createNewFile();
-			}
-			BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
-			FileOutputStream fos = new FileOutputStream(f);
-			BufferedOutputStream bout = new BufferedOutputStream(fos, 1024);
-			byte[] data = new byte[1024];
-			int read = 0;
-
-			long totalRead = 0;
+			f.getParentFile().mkdirs();
 			long fileSize = connection.getContentLength();
-
-			while ((read = in.read(data, 0, 1024)) >= 0) {
-				bout.write(data, 0, read);
-				totalRead += read;
-				this.percentage = (int) (totalRead * 100 / fileSize);
-				BootPanel.getProgressBar().setValue(this.percentage);
-				this.frame.repaint();
-
-			}
-			bout.close();
-			in.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private void checkLocalMD5(File launcher) {
-		if (!launcher.exists()) {
-			if(Downloader.netIsAvailable()) {
-				update(launcher, BootstrapConstants.getLauncherUrl());
-			}
-			else {
-				JOptionPane.showMessageDialog(null, "Connexion � internet impossible pour t�l�charger le launcher");
-			}
-		} else {
-			String localMD5 = FileUtil.getMD5(launcher);
-			if(Downloader.netIsAvailable()) {
-				String hostMD5 = readRemoteMD5(BootstrapConstants.getHashUrl());
-				if (!localMD5.equals(hostMD5)) {
-					update(launcher, BootstrapConstants.getLauncherUrl());
+			try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream());
+				 BufferedOutputStream bout = new BufferedOutputStream(new FileOutputStream(temp), 65536)) {
+				byte[] data = new byte[65536];
+				int read;
+				long totalRead = 0;
+				while ((read = in.read(data, 0, data.length)) >= 0) {
+					bout.write(data, 0, read);
+					totalRead += read;
+					if (fileSize > 0) {
+						this.percentage = (int) (totalRead * 100 / fileSize);
+						BootPanel.getProgressBar().setValue(this.percentage);
+						this.frame.repaint();
+					}
 				}
 			}
-			else {
-				JOptionPane.showMessageDialog(null, "Attention, vous �tes en mode offline. Une mise � jour pourrait �tre disponible.\nSi le launcher ne d�marre pas, merci de vous connecter � internet.");
+			if (!LauncherSignature.isValid(temp, info.md5, info.sig)) {
+				temp.delete();
+				return false;
+			}
+			try {
+				Files.move(temp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Files.move(temp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			}
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+			temp.delete();
+			return false;
+		}
+	}
+
+	private void checkLocalMD5(File launcher) {
+		if (!Downloader.netIsAvailable()) {
+			if (launcher.isFile()) {
+				JOptionPane.showMessageDialog(null, "Attention, vous \u00eates en mode hors ligne. Une mise \u00e0 jour pourrait \u00eatre disponible.\nSi le launcher ne d\u00e9marre pas, merci de vous connecter \u00e0 Internet.");
+			} else {
+				JOptionPane.showMessageDialog(null, "Connexion \u00e0 Internet impossible pour t\u00e9l\u00e9charger le launcher.");
+			}
+			return;
+		}
+		RemoteInfo info = readRemoteInfo(BootstrapConstants.getHashUrl());
+		if (info.md5.isEmpty()) {
+			// launcher.json illisible : on garde la version installee plutot que d'installer
+			// un fichier qu'on ne peut pas verifier
+			if (!launcher.isFile()) {
+				JOptionPane.showMessageDialog(null, "Le serveur de MajestyCraft ne r\u00e9pond pas correctement : le launcher ne peut pas \u00eatre t\u00e9l\u00e9charg\u00e9 pour l'instant.\nR\u00e9essaie dans quelques minutes.");
+			}
+			return;
+		}
+		if (launcher.isFile() && info.md5.equalsIgnoreCase(FileUtil.getMD5(launcher))) {
+			return;
+		}
+		if (!update(launcher, BootstrapConstants.getLauncherUrl(), info)) {
+			if (launcher.isFile()) {
+				JOptionPane.showMessageDialog(null, "La mise \u00e0 jour du launcher n'a pas pu \u00eatre v\u00e9rifi\u00e9e : elle n'est pas install\u00e9e.\nLa version d\u00e9j\u00e0 install\u00e9e va d\u00e9marrer.");
+			} else {
+				JOptionPane.showMessageDialog(null, "Le launcher t\u00e9l\u00e9charg\u00e9 n'a pas pu \u00eatre v\u00e9rifi\u00e9 (fichier incomplet ou signature invalide) : il n'est pas install\u00e9.\nR\u00e9essaie plus tard ou contacte le support MajestyCraft.");
 			}
 		}
 	}
 
 	/**
-	 * Lit le hash MD5 distant. Accepte le nouveau format JSON ({"md5": "..."})
-	 * et, en repli, l'ancien format texte brut (une seule ligne contenant le hash).
+	 * Lit launcher.json : {"md5": "...", "sig": "..."}. L'ancien format texte brut (une
+	 * seule ligne contenant le hash) donne une empreinte sans signature, donc refusee.
 	 */
-	private static String readRemoteMD5(String url) {
-		String raw = "";
+	static RemoteInfo readRemoteInfo(String url) {
+		RemoteInfo info = new RemoteInfo();
+		String raw;
 		try {
 			URL target = new URL(url);
 			HttpURLConnection connection = (HttpURLConnection) target.openConnection();
@@ -115,24 +149,29 @@ public class Downloader extends Thread {
 			raw = sb.toString().trim();
 		} catch (IOException e) {
 			e.printStackTrace();
-			return "";
+			return info;
 		}
 
 		try {
 			JsonObject obj = JsonParser.parseString(raw).getAsJsonObject();
 			if (obj.has("md5") && !obj.get("md5").isJsonNull()) {
-				return obj.get("md5").getAsString();
+				info.md5 = obj.get("md5").getAsString().trim();
+			}
+			if (obj.has("sig") && !obj.get("sig").isJsonNull()) {
+				info.sig = obj.get("sig").getAsString().trim();
 			}
 		} catch (Exception ignored) {
-			// Pas du JSON valide : on suppose l'ancien format texte brut (launcher.cfg)
+			// Pas du JSON valide : ancien format texte brut (launcher.cfg)
+			if (raw.matches("[0-9a-fA-F]{32}")) {
+				info.md5 = raw;
+			}
 		}
-		return raw;
+		return info;
 	}
-	
+
 	public void launch(File f) {
 		ProcessBuilder pb = new ProcessBuilder(new String[] { currentJavaExecutable(), "-jar", f.getAbsolutePath() });
 		try {
-			System.out.println("test");
 			pb.start();
 			exitProperly();
 		} catch (Exception e) {
@@ -166,7 +205,7 @@ public class Downloader extends Thread {
 	public int getProgress() {
 		return this.percentage;
 	}
-	
+
 	private static boolean netIsAvailable() {
 	    try {
 	        final URL url = new URL("https://www.google.com");
