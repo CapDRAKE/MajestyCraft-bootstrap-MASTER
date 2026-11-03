@@ -18,7 +18,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 
 import com.google.gson.JsonObject;
@@ -27,11 +26,11 @@ import com.google.gson.JsonParser;
 import fr.trxyy.alternative.alternative_api.utils.file.FileUtil;
 
 public class Downloader extends Thread {
-	public JFrame frame;
-	private int percentage;
+	/** Fenetre du bootstrap : etape en cours et progression. */
+	private final BootPanel ui;
 
-	public Downloader(JFrame fra) {
-		this.frame = fra;
+	public Downloader(BootPanel ui) {
+		this.ui = ui;
 	}
 
 	public void run() {
@@ -57,6 +56,7 @@ public class Downloader extends Thread {
 	 */
 	public boolean update(File f, String u, RemoteInfo info) {
 		File temp = new File(f.getParentFile(), f.getName() + ".part");
+		ui.status(f.isFile() ? "TELECHARGEMENT_MAJ" : "TELECHARGEMENT");
 		try {
 			URL url = new URL(u.replace(" ", "%20"));
 			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -71,13 +71,10 @@ public class Downloader extends Thread {
 				while ((read = in.read(data, 0, data.length)) >= 0) {
 					bout.write(data, 0, read);
 					totalRead += read;
-					if (fileSize > 0) {
-						this.percentage = (int) (totalRead * 100 / fileSize);
-						BootPanel.getProgressBar().setValue(this.percentage);
-						this.frame.repaint();
-					}
+					ui.downloaded(totalRead, fileSize);
 				}
 			}
+			ui.status("VERIFICATION");
 			if (!LauncherSignature.isValid(temp, info.md5, info.sig)) {
 				temp.delete();
 				return false;
@@ -87,6 +84,7 @@ public class Downloader extends Thread {
 			} catch (AtomicMoveNotSupportedException e) {
 				Files.move(temp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			}
+			ui.done("A_JOUR");
 			return true;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -96,6 +94,7 @@ public class Downloader extends Thread {
 	}
 
 	private void checkLocalMD5(File launcher) {
+		ui.status("RECHERCHE");
 		if (!Downloader.netIsAvailable()) {
 			if (launcher.isFile()) {
 				JOptionPane.showMessageDialog(null, "Attention, vous \u00eates en mode hors ligne. Une mise \u00e0 jour pourrait \u00eatre disponible.\nSi le launcher ne d\u00e9marre pas, merci de vous connecter \u00e0 Internet.");
@@ -114,6 +113,7 @@ public class Downloader extends Thread {
 			return;
 		}
 		if (launcher.isFile() && info.md5.equalsIgnoreCase(FileUtil.getMD5(launcher))) {
+			ui.done("A_JOUR");
 			return;
 		}
 		if (!update(launcher, BootstrapConstants.getLauncherUrl(), info)) {
@@ -170,6 +170,7 @@ public class Downloader extends Thread {
 	}
 
 	public void launch(File f) {
+		ui.done("LANCEMENT");
 		ProcessBuilder pb = new ProcessBuilder(new String[] { currentJavaExecutable(), "-jar", f.getAbsolutePath() });
 		try {
 			pb.start();
@@ -200,10 +201,6 @@ public class Downloader extends Thread {
 				System.exit(0);
 			}
 		}, 1500L);
-	}
-
-	public int getProgress() {
-		return this.percentage;
 	}
 
 	private static boolean netIsAvailable() {

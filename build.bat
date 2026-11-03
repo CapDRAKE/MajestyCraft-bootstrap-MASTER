@@ -71,6 +71,8 @@ popd
 :: Copy resources
 echo   [3/4] Copie des ressources...
 xcopy /s /y /i "%SRC%\resources" "%BUILD%\classes\resources\" >nul 2>nul
+:: logo.png (3 Mo) n'est lu nulle part : la fenetre utilise launcher.png
+if exist "%BUILD%\classes\resources\logo.png" del /q "%BUILD%\classes\resources\logo.png"
 
 :: Create manifest
 echo Main-Class: fr.trxyy.alternative.bootstrap.Home> "%BUILD%\MANIFEST.MF"
