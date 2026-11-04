@@ -9,7 +9,7 @@ title MajestyLauncher - Setup
 set "INSTALL_DIR=%LocalAppData%\MajestyCraft"
 set "JRE_DIR=%INSTALL_DIR%\jre"
 set "BOOTSTRAP_JAR=%INSTALL_DIR%\bootstrap.jar"
-set "LAUNCHER_VBS=%INSTALL_DIR%\MajestyLauncher.vbs"
+set "OLD_VBS=%INSTALL_DIR%\MajestyLauncher.vbs"
 set "UNINSTALL_BAT=%INSTALL_DIR%\Uninstall.bat"
 set "JAVA=%JRE_DIR%\bin\javaw.exe"
 set "JRE_URL=https://cdn.azul.com/zulu/bin/zulu8.92.0.21-ca-fx-jre8.0.482-win_x64.zip"
@@ -161,49 +161,44 @@ if exist "%SCRIPT_DIR%AlternativeAPI-bootstrap-master\src\resources\MajestyCraft
     copy /y "%SCRIPT_DIR%MajestyCraft.ico" "%ICON%" >nul
 )
 
-:: Creer le lanceur VBS (silencieux, pas de fenetre console)
-echo Set ws = CreateObject("WScript.Shell")> "%LAUNCHER_VBS%"
-echo ws.CurrentDirectory = "%INSTALL_DIR%">> "%LAUNCHER_VBS%"
-echo ws.Run """%JRE_DIR%\bin\javaw.exe"" -jar ""%BOOTSTRAP_JAR%""", 1, False>> "%LAUNCHER_VBS%"
+:: Les raccourcis lancent directement javaw.exe (signe par Azul, sans fenetre
+:: console). L'ancien lanceur MajestyLauncher.vbs ne sert plus : Microsoft
+:: desactivera VBScript par defaut dans Windows (annonce pour 2027 environ).
+del "%OLD_VBS%" 2>nul
 
 :: Creer le desinstalleur
 echo @echo off> "%UNINSTALL_BAT%"
+:: Les chemins sont ecrits en UTF-8 (chcp 65001 plus haut) : le desinstalleur doit
+:: les relire de meme, sinon un nom d'utilisateur accentue devient introuvable.
+echo chcp 65001 ^>nul>> "%UNINSTALL_BAT%"
 echo title MajestyCraft - Desinstallation>> "%UNINSTALL_BAT%"
 echo echo.>> "%UNINSTALL_BAT%"
 echo echo   Desinstallation de MajestyCraft...>> "%UNINSTALL_BAT%"
 echo echo.>> "%UNINSTALL_BAT%"
 echo del "%%USERPROFILE%%\Desktop\MajestyCraft.lnk" 2^>nul>> "%UNINSTALL_BAT%"
 echo del "%%AppData%%\Microsoft\Windows\Start Menu\Programs\MajestyCraft.lnk" 2^>nul>> "%UNINSTALL_BAT%"
+echo powershell -NoProfile -NonInteractive -Command "foreach ($n in 'Desktop','Programs') { $f = [Environment]::GetFolderPath($n); if ($f) { Remove-Item -LiteralPath (Join-Path $f 'MajestyLauncher.lnk') -ErrorAction SilentlyContinue } }" 2^>nul>> "%UNINSTALL_BAT%"
 echo cd /d "%%TEMP%%">> "%UNINSTALL_BAT%"
-echo rmdir /s /q "%INSTALL_DIR%" 2^>nul>> "%UNINSTALL_BAT%"
 echo rmdir /s /q "C:\ProgramData\MajestyCraft" 2^>nul>> "%UNINSTALL_BAT%"
-echo echo   MajestyCraft a ete desinstalle.>> "%UNINSTALL_BAT%"
-echo echo.>> "%UNINSTALL_BAT%"
-echo pause>> "%UNINSTALL_BAT%"
+:: Derniere ligne d'un seul tenant : le desinstalleur est dans le dossier qu'il
+:: supprime, cmd ne pourrait plus lire les lignes suivantes.
+echo rmdir /s /q "%INSTALL_DIR%" 2^>nul ^& echo   MajestyCraft a ete desinstalle. ^& echo. ^& pause>> "%UNINSTALL_BAT%"
 
 :: Supprimer ancien raccourci MajestyCraft s'il existe
 del "%USERPROFILE%\Desktop\MajestyCraft.lnk" 2>nul
 del "%USERPROFILE%\OneDrive\Bureau\MajestyCraft.lnk" 2>nul
 
-:: Creer raccourcis via VBS (plus fiable que PowerShell)
-set "SHORTCUT_VBS=%INSTALL_DIR%\shortcut_tmp.vbs"
-echo Set ws = CreateObject("WScript.Shell")> "%SHORTCUT_VBS%"
-echo Set lnk = ws.CreateShortcut(ws.SpecialFolders("Desktop") ^& "\MajestyLauncher.lnk")>> "%SHORTCUT_VBS%"
-echo lnk.TargetPath = "%LAUNCHER_VBS%">> "%SHORTCUT_VBS%"
-echo lnk.WorkingDirectory = "%INSTALL_DIR%">> "%SHORTCUT_VBS%"
-echo lnk.IconLocation = "%ICON%,0">> "%SHORTCUT_VBS%"
-echo lnk.Description = "Lancer MajestyLauncher">> "%SHORTCUT_VBS%"
-echo lnk.Save>> "%SHORTCUT_VBS%"
-echo Set lnk2 = ws.CreateShortcut(ws.SpecialFolders("Programs") ^& "\MajestyLauncher.lnk")>> "%SHORTCUT_VBS%"
-echo lnk2.TargetPath = "%LAUNCHER_VBS%">> "%SHORTCUT_VBS%"
-echo lnk2.WorkingDirectory = "%INSTALL_DIR%">> "%SHORTCUT_VBS%"
-echo lnk2.IconLocation = "%ICON%,0">> "%SHORTCUT_VBS%"
-echo lnk2.Description = "Lancer MajestyCraft">> "%SHORTCUT_VBS%"
-echo lnk2.Save>> "%SHORTCUT_VBS%"
-cscript //nologo "%SHORTCUT_VBS%" 2>nul
-del "%SHORTCUT_VBS%" 2>nul
-
-echo         Raccourcis crees.
+:: Raccourcis Bureau et menu Demarrer, crees par PowerShell. Les chemins sont lus
+:: dans les variables de ce script (JAVA, BOOTSTRAP_JAR, INSTALL_DIR, ICON) au lieu
+:: d'etre recopies dans un fichier : un nom d'utilisateur avec accents ou apostrophe
+:: reste intact, et Windows donne lui-meme le Bureau, meme deplace dans OneDrive.
+powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $q = [char]34; $s = New-Object -ComObject WScript.Shell; foreach ($n in 'Desktop','Programs') { $f = [Environment]::GetFolderPath($n); if (-not $f) { continue }; $l = $s.CreateShortcut((Join-Path $f 'MajestyLauncher.lnk')); $l.TargetPath = $env:JAVA; $l.Arguments = '-jar ' + $q + $env:BOOTSTRAP_JAR + $q; $l.WorkingDirectory = $env:INSTALL_DIR; $l.IconLocation = $env:ICON + ',0'; $l.Description = 'Lancer MajestyLauncher'; $l.Save() }"
+if errorlevel 1 (
+    echo         Attention : raccourcis non crees.
+    echo         Relancez ce script et choisissez [1] pour jouer.
+) else (
+    echo         Raccourcis crees.
+)
 
 :: --- Ecran de fin ---
 cls
@@ -261,8 +256,10 @@ echo.
 echo   Desinstallation en cours...
 del "%USERPROFILE%\Desktop\MajestyLauncher.lnk" 2>nul
 del "%AppData%\Microsoft\Windows\Start Menu\Programs\MajestyLauncher.lnk" 2>nul
+powershell -NoProfile -NonInteractive -Command "foreach ($n in 'Desktop','Programs') { $f = [Environment]::GetFolderPath($n); if ($f) { Remove-Item -LiteralPath (Join-Path $f 'MajestyLauncher.lnk') -ErrorAction SilentlyContinue } }" 2>nul
 cd /d "%TEMP%"
 rmdir /s /q "%INSTALL_DIR%" 2>nul
+rmdir /s /q "C:\ProgramData\MajestyCraft" 2>nul
 echo.
 echo   MajestyCraft a ete desinstalle avec succes.
 echo.

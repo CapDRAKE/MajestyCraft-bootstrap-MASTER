@@ -4,7 +4,6 @@
 
 set "SCRIPT_DIR=%~dp0"
 set "ICO=C:\MajestyCraftIcon\MajestyCraft.ico"
-set "VBS=%TEMP%\mksetuplnk.vbs"
 
 :: Verifier que l'ico existe
 if not exist "%ICO%" (
@@ -14,16 +13,14 @@ if not exist "%ICO%" (
     exit /b 1
 )
 
-:: Creer le raccourci via VBS
-> "%VBS%" echo Set ws = CreateObject("WScript.Shell")
->> "%VBS%" echo Set lnk = ws.CreateShortcut("%SCRIPT_DIR%MajestyCraft Setup.lnk")
->> "%VBS%" echo lnk.TargetPath = "%SCRIPT_DIR%MajestyLauncher.bat"
->> "%VBS%" echo lnk.WorkingDirectory = "%SCRIPT_DIR%"
->> "%VBS%" echo lnk.IconLocation = "%ICO%,0"
->> "%VBS%" echo lnk.Description = "Installer MajestyCraft"
->> "%VBS%" echo lnk.Save
-cscript //nologo "%VBS%"
-del "%VBS%" 2>nul
+:: Creer le raccourci par PowerShell (VBScript sera desactive par defaut dans Windows).
+:: Les chemins sont lus dans les variables SCRIPT_DIR et ICO de ce script.
+powershell -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $s = New-Object -ComObject WScript.Shell; $l = $s.CreateShortcut((Join-Path $env:SCRIPT_DIR 'MajestyCraft Setup.lnk')); $l.TargetPath = (Join-Path $env:SCRIPT_DIR 'MajestyLauncher.bat'); $l.WorkingDirectory = $env:SCRIPT_DIR; $l.IconLocation = $env:ICO + ',0'; $l.Description = 'Installer MajestyCraft'; $l.Save()"
+if errorlevel 1 (
+    echo Raccourci non cree.
+    pause
+    exit /b 1
+)
 
 echo Raccourci cree : MajestyCraft Setup.lnk
 pause

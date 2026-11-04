@@ -1,2 +1,5 @@
 # Scripts shell : toujours en LF (bash refuse les fins de ligne Windows)
 *.sh text eol=lf
+
+# Scripts Windows : toujours en CRLF (cmd gere mal les etiquettes goto en LF seul)
+*.bat text eol=crlf
